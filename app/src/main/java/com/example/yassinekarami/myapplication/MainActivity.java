@@ -6,15 +6,10 @@ import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -42,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     boolean connect = false;
 
+
     private final String myUUID = "00000000-0000-1000-8000-00805F9B34FB" ;
     private OutputStream outputStream;
 
@@ -56,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
         text = (TextView)findViewById(R.id.textView);
         myBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
 
         //Make the phone's visibility
         Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
@@ -64,13 +60,13 @@ public class MainActivity extends AppCompatActivity {
         startActivity(discoverableIntent);
 
 
-        if (bluetoothAdapter == null)
+        if (myBluetoothAdapter == null)
         {
             Toast.makeText(getApplicationContext(), "Bluetooth non activé !", Toast.LENGTH_SHORT).show();
         }
         else
         {
-            if (!bluetoothAdapter.isEnabled())
+            if (!myBluetoothAdapter.isEnabled())
             {
                 Toast.makeText(getApplicationContext(), "Bluetooth non activé !", Toast.LENGTH_SHORT).show();
                 // Possibilité 1 :
@@ -85,53 +81,100 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        if (myBluetoothAdapter != null) {
 
-        if (bluetoothAdapter != null) {
-            devices = bluetoothAdapter.getBondedDevices();
             // Display all the bonded Device
+            devices = myBluetoothAdapter.getBondedDevices();
             for (BluetoothDevice blueDevice : devices) {
                 Toast.makeText(getApplicationContext(), "Device = " + blueDevice.getName(), Toast.LENGTH_SHORT).show();
             }
 
-            // conection is DONE
-            myBluetoothDevice = myBluetoothAdapter.getRemoteDevice(macAdress);
-            if (myBluetoothDevice != null) {
-                Toast.makeText(getApplicationContext(), "connected to " +
-                        "  " + myBluetoothDevice.getAddress() + " " + myBluetoothDevice.getAddress(), Toast.LENGTH_LONG).show();
+            if (!devices.isEmpty()){
+                // conection is DONE
+                myBluetoothDevice = myBluetoothAdapter.getRemoteDevice(macAdress);
+                if (myBluetoothDevice != null) {
+                    Toast.makeText(getApplicationContext(), "connected to " +
+                            "  " + myBluetoothDevice.getAddress() + " " + myBluetoothDevice.getAddress(), Toast.LENGTH_LONG).show();
+
+                 // socket creation
+                    ConnectedThread ct = new ConnectedThread(myBluetoothDevice);
+                    ct.run();
+                }
             }
-
-            // socket creation
-            try {
-                BluetoothSocket myBluetoothSocket = myBluetoothDevice.createRfcommSocketToServiceRecord(UUID.fromString(myUUID));
-                myBluetoothSocket.connect();
-
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-
         }
     }
 
+    // the thread to create a FUCKING SOCKET
+    private class ConnectedThread extends  Thread {
 
-    public void write(String s) throws IOException {
-        outputStream.write(s.getBytes());
+        private final BluetoothSocket mmSocket;
+        private final BluetoothDevice mmDevice;
+
+
+        public ConnectedThread(BluetoothDevice device) {
+            // Use a temporary object that is later assigned to mmSocket
+            // because mmSocket is final.
+            BluetoothSocket tmp = null;
+            mmDevice = device;
+
+            try {
+                // Get a BluetoothSocket to connect with the given BluetoothDevice.
+                // MY_UUID is the app's UUID string, also used in the server code.
+                tmp = device.createRfcommSocketToServiceRecord(UUID.fromString(myUUID));
+            } catch (IOException e) { }
+            mmSocket = tmp;
+        }
+
+        public void run() {
+            // Cancel discovery because it otherwise slows down the connection.
+            myBluetoothAdapter.cancelDiscovery();
+
+            try {
+                // Connect to the remote device through the socket. This call blocks
+                // until it succeeds or throws an exception.
+                mmSocket.connect();
+
+                Toast.makeText(getApplicationContext(), "ergerg" +mmSocket.getRemoteDevice().getName(), Toast.LENGTH_LONG).show();
+                Toast.makeText(getApplicationContext(), "Socket connected", Toast.LENGTH_LONG).show();
+            } catch (IOException connectException) {
+                // Unable to connect; close the socket and return.
+               
+
+                Toast.makeText(getApplicationContext(), "Socket not connected", Toast.LENGTH_LONG).show();
+                try {
+                    mmSocket.close();
+                } catch (IOException closeException) {
+
+                }
+                return;
+            }
+            // The connection attempt succeeded. Perform work associated with
+            // the connection in a separate thread.
+
+        }
+
+        // Closes the client socket and causes the thread to finish.
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) {
+
+            }
+        }
     }
-
 
     // The output stream will be returned even if the socket is not yet connected,
     // but operations on that stream will throw IOException until the associated socket is connected.
     public void sendMessageClick(View view) throws IOException {
         if (myBluetoothSocket.isConnected()){
 
-            outputStream = myBluetoothSocket.getOutputStream();
-            outputStream.write(macAdressText.getText().toString().getBytes());
-            outputStream.flush();
-            Toast.makeText(getApplicationContext(),"socket sent", Toast.LENGTH_LONG).show();
-        }
 
+        }
     }
+
+
+
+
 
 
 
